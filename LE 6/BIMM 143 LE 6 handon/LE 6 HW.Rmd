@@ -1,0 +1,49 @@
+---
+title: "class06 HW"
+author: "Xueyi Wan A13913053"
+date: "2019/10/17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Section 1B Q6: Improving analysis code by writing functions
+
+Install the **bio3d** package for sequence and structure analysis
+```{r}
+#install.packages("bio3d")
+```
+
+improved code & output
+```{r}
+# use the installed bio3d package
+library(bio3d)
+
+# this function is used to analyze protein drug interaction by reading in a protein PDB data & output a plot for the protein
+# input argument (x) is the PDB code (e.g. "4AKE") for the protein
+# output is a plot for the specified protein analysis
+plot.protein <- function(x){
+ 
+  # read a PDB coordinate file by its code entered from the input argument, and assign this file to the project "protein"
+  protein <- read.pdb(x)
+  
+  # from the given protein pdb file, produce a new smaller pdb project that contains its chainA, and assign it to "protein.chainA"
+  protein.chainA <- trim.pdb(protein, chain = "A", elety = "CA")
+  # assign the atom b in the protein chainA to "protein.b"
+  protein.b <- protein.chainA$atom$b
+  
+  # draw a stardard scatter plot with secondary structure (chainA in this case) in the marginal regions
+  plotb3(protein.b, sse = protein.chainA, typ = "l", 
+         ylab = "Bfactor")
+}
+```
+
+```{r}
+# call the plot.protein() function to analyze three proteins
+plot.protein("4AKE") # kinase with drug
+plot.protein("1AKE") # kinase no drug
+plot.protein("1E4Y") # kinase with drug
+```
+
