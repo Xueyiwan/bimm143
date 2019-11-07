@@ -1,0 +1,66 @@
+---
+title: "class12"
+author: "Xueyi Wan
+date: "2019/11/7"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prepare for docking
+
+We want to produce a protein-only PDB file and a drug only PDB file
+
+```{r}
+library(bio3d)
+
+# download the PDB file
+get.pdb("1hsg")
+```
+
+```{r}
+pdb <- read.pdb("1hsg.pdb")
+protein <- atom.select(pdb, "protein", value = TRUE)
+write.pdb(protein, file = "1hsg_protein.pdb")
+```
+
+and for the ligand
+```{r}
+ligand <- atom.select(pdb, "ligand", value = TRUE)
+write.pdb(ligand, file = "1hsg_ligand.pdb")
+```
+
+## Using AutoDockTools to setup protein docking input
+
+## Prepare a docking configuration file
+
+## Processing your docking results
+
+```{r}
+library(bio3d)
+res <- read.pdb("all.pdbqt", multi = TRUE)
+write.pdb(res, "results.pdb")
+```
+
+```{r}
+ori <- read.pdb("1hsg_ligand.pdbqt")
+rmsd(ori, res)
+```
+
+## Exploring the conformational dynamics of proteins
+
+```{r}
+library(bio3d)
+pdb <- read.pdb("1HEL")
+
+modes <- nma(pdb)
+plot(modes, sse = pdb)
+```
+
+```{r}
+# Visualize NMA results
+mktrj(modes, mode = 7, file = "nma_7.pdb")
+```
+
