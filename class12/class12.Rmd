@@ -53,7 +53,7 @@ rmsd(ori, res)
 
 ```{r}
 library(bio3d)
-pdb <- read.pdb("1HEL")
+pdb <- read.pdb("1hel")
 
 modes <- nma(pdb)
 plot(modes, sse = pdb)
