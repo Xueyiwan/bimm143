@@ -48,7 +48,7 @@ If you use the View() function on our new cases_by_project object you will find 
 
 > Q9. Write the R code to make a barplot of the cases per project. Lets plot this data with a log scale for the y axis (log="y"), rotated axis labels (las=2) and color the bar coresponding to the TCGA-PAAD project.
 
-```{r}
+```{r, eval=FALSE}
 colvec <- rep("lightblue", nrow(x))
 colvec[ (x$key == "TCGA-PAAD") ] <- "red"
 #colvec
