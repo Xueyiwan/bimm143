@@ -1,0 +1,228 @@
+---
+title: "class14"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## DESeq2 setup
+
+We will use the DESeq2 package form bioconductor. To install this we ran **in the CONSOLE** - note eval = FALSE option!:
+
+```{r eval = FALSE}
+install.packages("BiocManager")
+BiocManager::install()
+
+# For this class, you'll also need DESeq2:
+BiocManager::install("DESeq2")
+```
+
+```{r}
+library(BiocManager)
+library("DESeq2")
+```
+
+## import countData and colData
+
+```{r}
+counts <- read.csv("data/airway_scaledcounts.csv", stringsAsFactors = FALSE)
+metadata <-  read.csv("data/airway_metadata.csv", stringsAsFactors = FALSE)
+
+head(counts)
+head(metadata)
+```
+
+How many genes do we have in this dataset?
+
+```{r}
+nrow(counts)
+```
+
+How many exps do we have?
+
+```{r}
+nrow(metadata)
+```
+
+
+## Toy differential gene expression
+
+If we look at our metadata, we see that the control samples are SRR1039508, SRR1039512, SRR1039516, and SRR1039520. 
+This bit of code will first find the sample id for those labeled control. Then calculate the mean counts per gene across these samples:
+
+```{r}
+control <- metadata[metadata[,"dex"] == "control", ]
+control.mean <- rowSums(counts[, control$id]) / length(control$id)
+names(control.mean) <- counts$ensgene
+```
+
+Q1. How would you make the above code more robust? What would happen if you were to add more samples. Would the values obtained with the excat code above be correct?
+
+Q2. Follow the same procedure for the treated samples (i.e. calculate the mean per gene accross drug treated samples and assign to a labeled vector called treated.mean)
+
+```{r}
+treated <- metadata[metadata[,"dex"] == "treated", ]
+treated.mean <- rowSums(counts[, treated$id]) / nrow(treated)
+names(treated.mean) <- counts$ensgene
+```
+
+We will combine our meancount data for bookkeeping purposes.
+
+```{r}
+meancounts <- data.frame(control.mean, treated.mean)
+
+colSums(meancounts)
+```
+
+Q3. Create a scatter plot showing the mean of the treated samples against the mean of the control samples. 
+
+```{r}
+plot(control.mean, treated.mean, log = "xy", xlab = "log Control", ylab = "log Treated")
+```
+
+We can find candidate differentially expressed genes by looking for genes with a large change between control and dex-treated samples. We usually look at the log2 of the fold change, because this has better mathematical properties.
+
+```{r}
+meancounts$log2fc <- log2(meancounts[,"treated.mean"]/meancounts[,"control.mean"])
+head(meancounts)
+```
+
+The NaN is returned when you divide by zero and try to take the log. The -Inf is returned when you try to take the log of zero. It turns out that there are a lot of genes with zero expression. Let’s filter our data to remove these genes. 
+
+```{r}
+zero.vals <- which(meancounts[,1:2]==0, arr.ind=TRUE)
+
+# If arr.ind == TRUE and x is an array (has a dim attribute), the result is arrayInd(which(x), dim(x), dimnames(x)), namely a matrix whose rows each are the indices of one element of x
+
+to.rm <- unique(zero.vals[,1])
+mycounts <- meancounts[-to.rm,]
+head(mycounts)
+```
+
+A common threshold used for calling something differentially expressed is a log2(FoldChange) of greater than 2 or less than -2. Let’s filter the dataset both ways to see how many genes are up or down-regulated.
+
+```{r}
+up.ind <- mycounts$log2fc > 2
+down.ind <- mycounts$log2fc < (-2)
+```
+
+Q5. Using the up.ind and down.ind vectors above can you determine how many up and down regulated genes we have at the greater than 2 fc level?
+
+```{r}
+sum(up.ind)
+sum(down.ind)
+```
+
+## DESeq2 analysis
+
+Let’s do this the right way. DESeq2 is an R package for analyzing count-based NGS data like RNA-seq. It is available from Bioconductor. Bioconductor is a project to provide tools for analyzing high-throughput genomic data including RNA-seq, ChIP-seq and arrays.
+
+```{r}
+library(DESeq2)
+citation("DESeq2")
+```
+
+Importing data
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData=counts, 
+                              colData=metadata, 
+                              design=~dex, 
+                              tidy=TRUE)
+dds
+```
+
+Run DESeq2
+
+```{r}
+dds <- DESeq(dds)
+```
+
+Get the results
+
+```{r}
+res <- results(dds)
+View(res)
+```
+
+## Data visualization
+
+###Volcano plots
+
+First, let’s add a column called sig to our full res results that evaluates to TRUE only if padj<0.05 and the absolute log2FoldChange>2, FALSE if not, and NA if padj is also NA.
+
+```{r}
+res$sig <- res$padj<0.05 & abs(res$log2FoldChange)>2
+
+# How many of each?
+table(res$sig)
+```
+
+```{r}
+sum(is.na(res$sig))
+```
+
+```{r}
+# Dual all black plot
+plot(res$log2FoldChange, -log(res$padj))
+abline(v = c(-2, 2), col = "gray", lty = 2)
+abline(h = -log(0.05), col = "gray", lty = 2)
+```
+
+```{r}
+# Add some color please
+mycols <- rep("grey", nrow(res))
+# make points with +2 -2 fold change blue
+mycols[ abs(res$log2FoldChange) > 2 ] <- "blue"
+
+# make points below p-value cutoff red
+mycols[ (res$padj) > 0.05 ] <- "red"
+
+plot(res$log2FoldChange, -log(res$padj), col = mycols)
+abline(v = c(-2, 2), col = "gray", lty = 2)
+abline(h = -log(0.05), col = "gray", lty = 2)
+```
+
+
+Here we first make a volcano plot with base graphics and color by our res$sig+1 (we add 1 so we dont have 0 as a color and end up with white points):
+
+```{r}
+# Set the color palette for our plot
+palette( c("gray","blue") )
+
+plot( res$log2FoldChange,  -log(res$padj), 
+ col=res$sig+1, ylab="-Log(P-value)", xlab="Log2(FoldChange)")
+
+# Add some cut-off lines
+abline(v=c(-2,2), col="darkgray", lty=2)
+abline(h=-log(0.1), col="darkgray", lty=2)
+```
+
+```{r}
+# Reset the color palette
+palette("default")      
+```
+
+```{r}
+# Setup our custom point color vector 
+mycols <- rep("gray", nrow(res))
+mycols[ abs(res$log2FoldChange) > 2 ]  <- "red" 
+
+inds <- (res$padj < 0.01) & (abs(res$log2FoldChange) > 2 )
+mycols[ inds ] <- "blue"
+
+#Volcano plot with custom colors 
+plot( res$log2FoldChange,  -log(res$padj), 
+ col=mycols, ylab="-Log(P-value)", xlab="Log2(FoldChange)" )
+
+abline(v=c(-2,2), col="gray", lty=2)
+abline(h=-log(0.1), col="gray", lty=2)
+```
+
+Save our results for next day...
+```{r}
+write.csv(res, file = "expression_results.csv")
+```
+
