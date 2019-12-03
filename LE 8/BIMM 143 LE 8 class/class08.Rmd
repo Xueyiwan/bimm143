@@ -1,0 +1,333 @@
+---
+title: "class08"
+author: "Xueyi Wan"
+date: "2019/10/24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## K-means clustering
+
+```{r}
+# Generate some example data for clustering
+temp <- c(rnorm(30, -3), rnorm(30, 3))
+x <- cbind(x = temp, y = rev(temp))
+
+plot(x)
+```
+
+Use the **kmeans()** function setting k to 2 and nstart=20
+
+```{r}
+k <- kmeans(x, centers = 2, nstart = 20)
+```
+
+
+Inspect/print the results
+
+```{r}
+k
+```
+
+
+Q. How many points are in each cluster?
+Q. What ‘component’ of your result object details
+    - cluster size?
+    - cluster assignment/membership?
+    - cluster center?
+
+```{r}
+k$size
+k$cluster
+k$centers
+```
+
+    
+Plot x colored by the kmeans cluster assignment and add cluster centers as blue points
+
+```{r}
+plot(x, col = k$cluster)
+points(k$centers, col = "blue", pch = 15)
+```
+
+
+## Hierarchical clustering in R
+The 'hclust()' function requires a distance matrix as input. You can get this from the 'dist()' function
+```{r}
+# First we need to calculate point (dis)similarity
+# as the Euclidean distance between observations
+dist_matrix <- dist(x)
+
+# The hclust() function returns a hierarchical
+# clustering model
+hc <- hclust(d = dist_matrix)
+
+# the print method is not so useful here
+hc
+```
+
+```{r}
+# Draws a dendrogram
+plot(hc)
+abline(h = 6, col = "red")
+cutree(hc, h = 6) # Cut by height h
+cutree(hc, k = 2) # Cut into k groups
+```
+
+```{r}
+# Step 1. Generate some example data for clustering
+x <- rbind(
+  matrix(rnorm(100, mean=0, sd = 0.3), ncol = 2), # c1
+  matrix(rnorm(100, mean = 1, sd = 0.3), ncol = 2), # c2
+  matrix(c(rnorm(50, mean = 1, sd = 0.3), # c3
+           rnorm(50, mean = 0, sd = 0.3)), ncol = 2))
+
+colnames(x) <- c("x", "y")
+
+# Step 2. Plot the data without clustering
+plot(x)
+
+# Step 3. Generate colors for known clusters
+# (just so we can compare to hclust results)
+col <- as.factor( rep(c("c1","c2","c3"), each=50) )
+
+plot(x, col=col)
+```
+
+Q. Use the dist(), hclust(), plot() and cutree() functions to return 2 and 3 clusters
+Q. How does this compare to your known 'col' groups?
+
+```{r}
+# Clustering
+hc <- hclust( dist(x) )
+
+# Draw tree
+plot(hc)
+abline(h = 2, col = "red")
+
+# Cut the tree into clusters/groups
+grps <- cutree(hc, k = 3)
+grps
+```
+
+Plot the data colored by their hclust result with k = 3
+```{r}
+plot(x, col = grps)
+```
+
+How many points in each cluster
+```{r}
+table(grps)
+```
+
+Cross-tablulate i.e. compare our clustering result with the known answer
+```{r}
+table(grps, col)
+```
+
+## Hands on with Principle Component Analysis (PCA)
+
+### PCA of UK food data
+
+#### Checking your data
+
+First lets read in our data
+```{r}
+x <- read.csv("UK_foods.csv", row.names = 1)
+```
+
+Complete the following code to find out how many rows and columns are in x?
+```{r}
+dim(x)
+
+# alternatively
+ncol(x)
+nrow(x)
+```
+
+Preview the first 6 rows
+```{r}
+head(x)
+```
+
+#### Spotting major differences and trends
+
+Indeed in general it is difficult to extract meaning in regard to major differences and trends from any given array of numbers.
+```{r}
+barplot(as.matrix(x), beside = T, col = rainbow(nrow(x)))
+barplot(as.matrix(x), beside = F, col = rainbow(nrow(x)))
+
+# Generating all pairwise plots
+pairs(x, col = rainbow(10), pch = 16)
+```
+
+```{r}
+
+```
+
+Generating regular bar-plots and various pairwise plots does not help too much either.
+
+#### PCA to the rescue
+
+```{r}
+# Use the prcomp() PCA function 
+
+#  prcomp() expects the observations to be rows and the variables to be columns therefore we need to first transpose our data.frame matrix with the t() transpose function.
+pca <- prcomp( t(x) )
+summary(pca)
+```
+
+Now generate a plot of PC1 vs. PC2.
+```{r}
+# Plot PC1 vs PC2
+plot(pca$x[,1], pca$x[,2], xlab="PC1", ylab="PC2",
+     xlim=c(-270,500))
+
+# adds text labels over the data points
+text(pca$x[,1], pca$x[,2], colnames(x), 
+     col = c("orange", "red", "blue", "green"))
+
+```
+
+In the **prcomp()** function we can use the **summary()** command above or examine the returned **pca$sdev**
+```{r}
+summary(pca)
+```
+
+Below we can use the square of pca$sdev , which stands for “standard deviation”, to calculate how much variation in the original data each PC accounts for.
+```{r}
+v <- round( pca$sdev^2/sum(pca$sdev^2) * 100 )
+v
+
+## or the second row here...
+z <- summary(pca)
+z$importance
+```
+
+This information can be summarized in a plot of the variances (eigenvalues) with respect to the principal component number (eigenvector number), which is given below.
+```{r}
+barplot(v, xlab="Principal Component", ylab="Percent Variation")
+```
+
+#### Digging deeper (variable loading)
+
+We can consider the influence of each of the original variables upon the principal components (typically known as **loading scores**).
+This information can be obtained from the **prcomp()** returned **$rotation** component.
+```{r}
+## Lets focus on PC1 as it accounts for > 90% of variance 
+par(mar=c(10, 3, 0.35, 0))
+barplot( pca$rotation[,1], las=2 )
+```
+
+another way to see this information together with the main PCA plot is in a so-called **biplot**
+```{r}
+## The inbuilt biplot() can be useful for small datasets 
+biplot(pca)
+```
+
+## PCA of RNA-seq data
+
+First lets read our example data to work with
+```{r}
+## You can also download this file from the class website!
+rna.data <- read.csv("https://tinyurl.com/expression-CSV",
+row.names=1)
+
+head(rna.data)
+```
+
+How many rows/columes? What is the dimension of the data? How many genes (the columns)?
+```{r}
+# note: the samples are columns, and the genes are rows
+dim(rna.data)
+ncol(rna.data) # How many samples
+nrow(rna.data) # How many genes
+```
+
+Now we have our data we call **prcomp()** to do PCA
+```{r}
+## lets do PCA
+## Again we have to take the transpose of our data
+pca <- prcomp(t(rna.data), scale=TRUE)
+
+## See what is returned by the prcomp() function
+attributes(pca)
+```
+
+The returned **pca$x** here contains the principal components (PCs) for drawing our first graph.
+```{r}
+# Here we will take the first two columns in pca$x (corresponding to PC1 and PC2) to draw a 2-D plot
+
+## A basic PC1 vs PC2 2-D plot
+plot(pca$x[,1], pca$x[,2])
+```
+
+Now we can use the square of **pca$sdev**, which stands for “standard deviation”, to calculate how much variation in the original data each PC accounts for
+```{r}
+## Variance captured per PC
+pca.var <- pca$sdev^2
+
+## Percent variance is often more informative to look at
+pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
+pca.var.per
+
+# We can use this to generate our standard screen-plot like this
+barplot(pca.var.per, main="Scree Plot", xlab="Principal Component",
+        ylab="Percent Variation")
+```
+
+From the “scree plot” it is clear that PC1 accounts for almost all of the variation in the data! Which means there are big differences between these two groups that are separated along the PC1 axis…
+
+Lets make our plot a bit more useful
+```{r}
+plot(pca$x[,1], pca$x[,2],
+     col = c("red", "red", "red", "red", "red",
+             "blue", "blue", "blue", "blue", "blue"))
+```
+
+```{r}
+## A vector of colors for wt and ko samples
+colvec <- colnames(rna.data)
+colvec[grep("wt", colvec)] <- "red"
+colvec[grep("ko", colvec)] <- "blue"
+
+plot(pca$x[,1], pca$x[,2], col = colvec, pch = 16, 
+     xlab = paste0("PC1 (", pca.var.per[1], "%)"),
+     ylab = paste0("PC2 (", pca.var.per[2], "%)"))
+
+text(pca$x[,1], pca$x[,2], labels = colnames(rna.data), 
+     pos = c(rep(4,5), rep(2,5)))
+```
+
+```{r}
+## Another way to color by sample type
+## Extract the first 2 characters of the sample name
+sample.type <- substr(colnames(rna.data),1,2)
+sample.type
+
+## now use this as a factor input to color our plot
+plot(pca$x[,1], pca$x[,2], col=as.factor(sample.type), pch=16)
+
+```
+
+Find the top 10 measurements (genes) that contribute most to pc1 in either direction (+ or -)
+```{r}
+loading_scores <- pca$rotation[,1]
+
+## Find the top 10 measurements (genes) that contribute most to PC1 in either direction (+ or -)
+gene_scores <- abs(loading_scores) 
+gene_score_ranked <- sort(gene_scores, decreasing=TRUE)
+
+## show the names of the top 10 genes
+top_10_genes <- names(gene_score_ranked[1:10])
+top_10_genes 
+```
+
+# Session Information
+```{r}
+sessionInfo()
+```
+
