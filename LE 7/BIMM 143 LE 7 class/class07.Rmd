@@ -2,7 +2,7 @@
 title: "Class 7 R functions and packages"
 author: "Xueyi Wan"
 date: "2019/10/22"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -128,7 +128,7 @@ both_na2 <- function(x, y) {
 }
 ```
 
-```{r}
+```{r, eval = FALSE}
 both_na2(x, y3)
 ```
 
