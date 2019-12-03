@@ -1,0 +1,171 @@
+---
+title: "class18_part1"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r eval=FALSE}
+BiocManager::install( c("GenomicDataCommons", "TCGAbiolinks", "maftools") )
+
+```
+
+```{r}
+library(GenomicDataCommons)
+library(TCGAbiolinks)
+library(maftools)
+```
+
+```{r}
+status()
+```
+
+# Querying the GDC from R
+
+The are four main sets of metadata that we can query, namely projects(), cases(), files(), and annotations(). We will start with projects()
+
+```{r}
+projects <- getGDCprojects()
+head(projects)
+```
+
+If you use the View(projects) function call you can see all the project names (such as Neuroblastoma, Pancreatic Adenocarcinoma, etc.) along with their project IDs (such as TARGET-NBL, TCGA-PAAD, etc.) and associated information.
+
+Moving onto cases() we can use an example from the package associated publication to answer our first from question above (i.e. find the number of cases/patients across different projects within the GDC):
+
+```{r}
+cases_by_project <- cases() %>%
+  facet("project.project_id") %>%
+  aggregations()
+head(cases_by_project)
+```
+
+Note that the facet() and aggregations() functions here are from the GenomicDataCommons package and act to group all cases by the project id and then count them up.
+
+If you use the View() function on our new cases_by_project object you will find that the data we are after is accessible via cases_by_project$project.project_id.
+
+> Q9. Write the R code to make a barplot of the cases per project. Lets plot this data with a log scale for the y axis (log="y"), rotated axis labels (las=2) and color the bar coresponding to the TCGA-PAAD project.
+
+```{r}
+colvec <- rep("lightblue", nrow(x))
+colvec[ (x$key == "TCGA-PAAD") ] <- "red"
+#colvec
+
+barplot(x$doc_count, col = colvec, log = "y")
+```
+
+```{r}
+x <- cases_by_project$project.project_id
+
+# Make a custom color vector for our plot
+colvec <- rep("lightblue", nrow(x))
+colvec[(x$key == "TCGA-PAAD")] <- "red"
+
+# Plot with 'log' for y axis and rotate labels with 'las'
+#par(___)  
+barplot(x$doc_count, names.arg=x$key, log="y", col=colvec, las=2)
+```
+
+Lets explore some other functions from the related TCGAbiolinks package.
+
+We can use the **getSampleFilesSummary()** function to determine for a given project how many cases and what type of data we have available for each case:
+
+```{r}
+samp <- getSampleFilesSummary("TCGA-PAAD")
+head(samp)
+```
+
+Now we can use **GDCquery()** function to focus in on a particular data type that we are interested in. For example, to answer our second question from above - namely ‘find all gene expression data files for all pancreatic cancer patients’:
+
+```{r}
+query <- GDCquery(project="TCGA-PAAD",
+                  data.category="Transcriptome Profiling",
+                  data.type="Gene Expression Quantification")
+
+ans <- getResults(query)
+```
+
+```{r}
+head(ans)
+```
+
+We should see that ans contains a row for every RNA-Seq data file from the ‘TCGA-PAAD’ project. At the time of writing this was 546 RNA-Seq data files.
+
+```{r}
+nrow(ans)
+```
+
+# Variant analysis with R
+
+Lets do the same search in R with the help of the TCGAbiolinks package function GDCquery_Maf(). For brevity we will focus on only one of the MAF files for this project, namely the MuTect2 workflow variant calls.
+
+```{r}
+maf.file <- GDCquery_Maf(tumor="PAAD", pipelines = "mutect")
+```
+
+```{r}
+head(maf.file)
+```
+
+## MAF analysis
+
+The MAF file contents is now stored as a dataframe and the maftools package workflow, which starts with a MAF file or dataframe, can proceed, starting with reading the pancreatic cancer MAF file.
+
+```{r}
+vars = read.maf(maf = maf.file, verbose = FALSE)
+```
+
+## Plotting MAP summary
+
+We can use plotmafSummary() function to plot a summary of the maf object, which displays number of variants in each sample as a stacked barplot and variant types as a boxplot summarized by Variant_Classification. We can add either mean or median line to the stacked barplot to display average/median number of variants across the cohort.
+
+```{r}
+plotmafSummary(vars)
+
+```
+
+## Drawing oncoplots
+
+A very useful summary representation of this data can be obtained via so-called oncoplots, also known as waterfall plots.
+
+```{r}
+oncoplot(maf = vars, top = 10)
+```
+
+Another option is to send your plot to a PNG or PDF plot device directly, for example:
+
+```{r}
+# Oncoplot for our top 10 most frequently mutated genes
+pdf("oncoplot_panc.pdf")
+oncoplot(maf = vars, top = 10, fontSize = 12)
+dev.off()
+```
+
+## Oncostrip
+
+We can visualize any set of genes using the oncostrip() function, which draws mutations in each sample similar to the graphic on the NCI-GDC web portal. Note that oncostrip() can be used to draw any number of genes using the input top or genes arguments
+
+```{r}
+oncostrip(maf=vars, genes=c("KRAS", "TP53"))
+```
+
+Another plot focusing on KRAS in our particular dataset.
+
+```{r}
+lollipopPlot(vars, gene='KRAS')
+```
+
+> Q11. Adapt the code above to produce a lollipop plot for p53 (i.e. the ‘TP53’ gene)?
+
+```{r}
+lollipopPlot(vars, gene='TP53')
+```
+
+# Summary
+
+Additional functionality is available for each of the GenomicDataCommons, TCGAbiolinks and maftools packages not to mention the 100’s of other bioinformatics R packages that can now work with this type of data in both exploratory and targeted analysis modes.
+
+The purpose of this hands-on session was to highlight how one can leverage three such packages to quickly gain insight into rapidly expanding public cancer genomics data-sets. Hopefully this will inspire your further exploration of these and other bioinformatics R packages.
+
